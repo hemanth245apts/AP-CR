@@ -1,5 +1,9 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
 const db = require('../db');
+const auth = require('../middleware/auth');
+const { upload, imageValidator } = require('../middleware/validateimage');
 const router = express.Router();
 
 // GET HOMEPAGE OFFICIALS (hero banner)

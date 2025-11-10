@@ -9,7 +9,8 @@ const app = express();
 
 const homepageRoutes = require('./routes/homepage');
 const userRoutes = require('./routes/users');
-
+const AdminRoutes = require('./routes/admin');
+const AboutRoutes = require('./routes/about');
 dotenv.config();
 
 const PORT = process.env.PORT;
@@ -64,7 +65,8 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/user', userRoutes);
 app.use('/homepage', homepageRoutes);
-
+app.use('/admin', AdminRoutes);
+app.use('/about', AboutRoutes);
 
 app.use((req, res) => {
     res.status(404).json({ message: 'Route not found' });
