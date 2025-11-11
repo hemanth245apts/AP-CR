@@ -11,17 +11,17 @@ const upload = multer({
     fileFilter: (req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
 
-        // ❌ Reject double extensions like resume.pdf.exe
+        // Reject double extensions like resume.pdf.exe
         if (file.originalname.split(".").length > 2) {
             return cb(new Error("Double extensions are not allowed"));
         }
 
-        // ✅ Allow only .pdf files
+        // Allow only .pdf files
         if (ext !== ".pdf") {
             return cb(new Error("Only .pdf files are allowed"));
         }
 
-        // ✅ Basic MIME validation
+        // Basic MIME validation
         if (file.mimetype !== "application/pdf") {
             return cb(new Error("Invalid MIME type — must be application/pdf"));
         }
@@ -30,9 +30,8 @@ const upload = multer({
     },
 });
 
-// ✅ Validate PDF binary structure and scan for malicious content
+// Validate PDF binary structure and scan for malicious content
 function isValidPDF(buffer) {
-    // PDFs start with "%PDF-" and end with "%%EOF"
     const header = buffer.slice(0, 5).toString("utf8");
     const trailer = buffer.slice(-10).toString("utf8");
 
@@ -40,7 +39,6 @@ function isValidPDF(buffer) {
         return false;
     }
 
-    // 🚫 Check for malicious tags or embedded scripts
     const textContent = buffer.toString("latin1");
 
     const suspiciousPatterns = [
@@ -48,10 +46,10 @@ function isValidPDF(buffer) {
         /javascript:/i,
         /\/JS/i,
         /\/JavaScript/i,
-        /\/AA/i, // automatic actions
-        /\/OpenAction/i, // auto-execution actions
+        /\/AA/i,
+        /\/OpenAction/i,
         /\/Launch/i,
-        /\/RichMedia/i, // embedded video/flash
+        /\/RichMedia/i,
         /<iframe/i,
         /eval\s*\(/i,
         /<img[\s\S]*onerror=/i,
@@ -59,7 +57,7 @@ function isValidPDF(buffer) {
 
     for (const pattern of suspiciousPatterns) {
         if (pattern.test(textContent)) {
-            console.warn("⚠️ Detected malicious content in uploaded PDF.");
+            console.warn("Detected malicious content in uploaded PDF.");
             return false;
         }
     }
@@ -67,28 +65,40 @@ function isValidPDF(buffer) {
     return true;
 }
 
-// ✅ Main middleware to validate PDF securely
+// ✅ UPDATED: Validate *both* pdf_english and pdf_telugu
 function pdfValidator(req, res, next) {
     try {
-        if (!req.file) {
+        const english = req.files?.pdf_english?.[0];
+        const telugu = req.files?.pdf_telugu?.[0];
+
+        // ✅ Require at least one file
+        if (!english && !telugu) {
             return res.status(400).json({ message: "No file uploaded" });
         }
 
-        const { originalname, buffer, mimetype } = req.file;
+        // ✅ Combine available files
+        const files = [english, telugu].filter(Boolean);
 
-        // ✅ Confirm correct extension and MIME
-        if (path.extname(originalname).toLowerCase() !== ".pdf" || mimetype !== "application/pdf") {
-            return res.status(400).json({ message: "Invalid file type. Only PDF files are allowed." });
+        // ✅ Validate each file using your existing logic
+        for (const file of files) {
+            const { originalname, buffer, mimetype } = file;
+
+            if (path.extname(originalname).toLowerCase() !== ".pdf" ||
+                mimetype !== "application/pdf") {
+                return res.status(400).json({ message: "Invalid file type. Only PDF files are allowed." });
+            }
+
+            if (!isValidPDF(buffer)) {
+                return res.status(400).json({ message: "Invalid or potentially unsafe PDF file" });
+            }
         }
 
-        // ✅ Validate PDF structure
-        if (!isValidPDF(buffer)) {
-            return res.status(400).json({ message: "Invalid or potentially unsafe PDF file" });
-        }
+        // ✅ Attach them for your route if needed
+        req.validatedPDFs = {
+            english,
+            telugu
+        };
 
-        // ✅ Passed all checks → attach to req for route use
-        req.pdfBuffer = buffer;
-        req.pdfOriginalName = originalname;
         next();
     } catch (err) {
         console.error("PDF validation error:", err);

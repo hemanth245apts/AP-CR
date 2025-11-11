@@ -83,15 +83,18 @@ router.get("/rti", async (req, res, next) => {
 // AUTHENTICATED ADMIN ACTIONS
 // -----------------------------------------------------
 
-// PUT /about  (update vision & mission)
-router.put("/", auth, async (req, res, next) => {
+// POST /about  (create vision & mission)
+router.post("/", auth, async (req, res, next) => {
     try {
         const { vision_statement, mission_statements } = req.body;
 
         await q(
-            `UPDATE about_content
-             SET vision_statement = ?, mission_statements = ?, updated_at = CURRENT_TIMESTAMP
-             WHERE id = 1`,
+            `INSERT INTO about_content (id, vision_statement, mission_statements)
+             VALUES (1, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                vision_statement = VALUES(vision_statement),
+                mission_statements = VALUES(mission_statements),
+                updated_at = CURRENT_TIMESTAMP`,
             [vision_statement, mission_statements]
         );
 
@@ -101,8 +104,9 @@ router.put("/", auth, async (req, res, next) => {
     }
 });
 
-// PUT /about/organisation  (text + chart image)
-router.put(
+
+// POST /about/organisation  (create description + chart image)
+router.post(
     "/organisation",
     auth,
     imageUpload.single("chart_image"),
@@ -113,15 +117,19 @@ router.put(
 
             let imageUrl = null;
             if (req.file) {
-                imageUrl = "/images/" + path.basename(req.file.path);
+                const base = path.basename(req.file.path);
+                const stamped = `${base}_${Date.now()}`;
+                imageUrl = `/images/${stamped}`;
             }
 
+
             await q(
-                `UPDATE about_organisation
-                 SET description = ?,
-                     chart_image_url = COALESCE(?, chart_image_url),
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = 1`,
+                `INSERT INTO about_organisation (id, description, chart_image_url)
+                 VALUES (1, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                    description = VALUES(description),
+                    chart_image_url = COALESCE(VALUES(chart_image_url), chart_image_url),
+                    updated_at = CURRENT_TIMESTAMP`,
                 [description, imageUrl]
             );
 
@@ -131,6 +139,7 @@ router.put(
         }
     }
 );
+
 
 // POST /about/chairmans
 router.post("/chairmans", auth, async (req, res, next) => {
@@ -177,8 +186,9 @@ router.delete("/chairmans/:id", auth, async (req, res, next) => {
     }
 });
 
-// PUT /about/rti (update PDF + officer details)
-router.put(
+
+// POST /about/rti (create PDF + officer details)
+router.post(
     "/rti",
     auth,
     pdfUpload.fields([
@@ -202,24 +212,31 @@ router.put(
 
             if (req.files && req.files.pdf_english) {
                 const f = req.files.pdf_english[0];
-                englishPDF = "/pdfs/" + f.originalname;
-                // You should save f.buffer to disk yourself
+                englishPDF = `/pdfs/${f.originalname}_${Date.now()}`;
             }
 
             if (req.files && req.files.pdf_telugu) {
                 const f = req.files.pdf_telugu[0];
-                teluguPDF = "/pdfs/" + f.originalname;
-                // Save to disk yourself as well
+                teluguPDF = `/pdfs/${f.originalname}_${Date.now()}`;
             }
 
             await q(
-                `UPDATE about_rti
-                 SET pio_name = ?, pio_phone = ?, apio_name = ?, apio_phone = ?,
-                     appellate_name = ?, appellate_phone = ?,
-                     pdf_english_url = COALESCE(?, pdf_english_url),
-                     pdf_telugu_url = COALESCE(?, pdf_telugu_url),
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE id = 1`,
+                `INSERT INTO about_rti (
+                    id, pio_name, pio_phone, apio_name, apio_phone,
+                    appellate_name, appellate_phone,
+                    pdf_english_url, pdf_telugu_url
+                 )
+                 VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                    pio_name = VALUES(pio_name),
+                    pio_phone = VALUES(pio_phone),
+                    apio_name = VALUES(apio_name),
+                    apio_phone = VALUES(apio_phone),
+                    appellate_name = VALUES(appellate_name),
+                    appellate_phone = VALUES(appellate_phone),
+                    pdf_english_url = COALESCE(VALUES(pdf_english_url), pdf_english_url),
+                    pdf_telugu_url = COALESCE(VALUES(pdf_telugu_url), pdf_telugu_url),
+                    updated_at = CURRENT_TIMESTAMP`,
                 [
                     pio_name,
                     pio_phone,
@@ -238,5 +255,6 @@ router.put(
         }
     }
 );
+
 
 module.exports = router;
