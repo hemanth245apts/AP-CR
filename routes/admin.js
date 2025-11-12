@@ -17,7 +17,7 @@ function isMaliciousText(text) {
     /javascript:/g,
     /<.*?>/g,
     /eval\s*\(/g,
-    /base64,/g,
+    // /base64,/g,
     /drop\s+table/g,
     /union\s+select/g,
     /--/g
@@ -68,14 +68,7 @@ router.post(
 
       res.status(201).json({
         message: 'Official added successfully',
-        official: {
-          id: result.insertId,
-          name,
-          title,
-          imageUrl,
-          link_url,
-          display_order: order,
-        },
+       
       });
     });
   }
@@ -128,62 +121,68 @@ router.post(
 
       res.status(201).json({
         message: 'Carousel image uploaded successfully',
-        carousel: {
-          id: result.insertId,
-          alt_text,
-          imageUrl,
-          display_order: order,
-        },
       });
     });
   }
 );
 
 
-//Delete Carousel based on Image url
-router.post('/homepage/deleteCarousel', auth, (req, res) => {
-  const { image_url } = req.body;
+//Delete Carousel based on ID
+router.delete('/homepage/Carousel', auth, (req, res) => {
+  const { id } = req.body;
 
-  if (!image_url) {
-    return res.status(400).json({ message: 'Image URL is required' });
+  // Input validation
+  if (!id || isNaN(id) || id <= 0) {
+    return res.status(400).json({ message: 'Valid ID is required' });
   }
-  // Step 1: Find record in DB
-  const selectQuery = 'SELECT image_url FROM homepage_carousel WHERE image_url = ?';
-  db.query(selectQuery, [image_url], (err, rows) => {
+
+  const cleanId = String(id).trim();
+  if (isMaliciousText(cleanId)) {
+    return res.status(400).json({ message: 'Malicious input detected' });
+  }
+
+  // Find image path from DB
+  const selectQuery = 'SELECT image_url FROM homepage_carousel WHERE id = ?';
+  db.query(selectQuery, [cleanId], (err, rows) => {
     if (err) {
       console.error(' Database select error:', err);
-      return res.status(500).json({ message: 'Database error' });
+      return res.status(500).json({ message: 'Database error during lookup' });
     }
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'Image not found in database' });
+      return res.status(404).json({ message: 'Carousel image not found' });
     }
 
-    // Step 2: Delete image file from folder
-    const imgPath = path.join(__dirname, '..', rows[0].image_url);
+    const imageUrl = rows[0].image_url;
+    const imgPath = path.join(__dirname, '..', imageUrl);
+
+    //Delete file from disk
     try {
       if (fs.existsSync(imgPath)) {
         fs.unlinkSync(imgPath);
         console.log(' Deleted image file:', imgPath);
       } else {
-        console.warn(' Image file not found on disk:', imgPath);
+        console.warn('Image file not found on disk:', imgPath);
       }
     } catch (fileErr) {
       console.error(' Error deleting image file:', fileErr);
     }
 
-    // Step 3: Delete DB record
-    const deleteQuery = 'DELETE FROM homepage_carousel WHERE image_url = ?';
-    db.query(deleteQuery, [image_url], (err2, result) => {
+    // Delete record from DB
+    const deleteQuery = 'DELETE FROM homepage_carousel WHERE id = ?';
+    db.query(deleteQuery, [cleanId], (err2, result) => {
       if (err2) {
         console.error(' Database delete error:', err2);
         return res.status(500).json({ message: 'Database error while deleting record' });
       }
 
-      console.log(' Carousel image deleted:', image_url);
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'No record deleted (invalid ID?)' });
+      }
+
+      console.log(' Carousel record deleted for ID:', cleanId);
       return res.json({
         message: 'Carousel image and record deleted successfully',
-        deletedRows: result.affectedRows,
       });
     });
   });
@@ -236,20 +235,14 @@ router.post('/homepage/sidebar/add_updates', auth, (req, res) => {
 
     res.status(201).json({
       message: 'Sidebar Update link added successfully.',
-      sidebar_link: {
-        id: result.insertId,
-        name,
-        url,
-        type,
-        display_order: order,
-      },
+     
     });
   });
 });
 
 
 //sidebar upadat_update link
-router.post('/homepage/sidebar/update_updates', auth, (req, res) => {
+router.put('/homepage/sidebar/updates', auth, (req, res) => {
   let { id, name, url, display_order } = req.body;
 
   // Validate ID
@@ -312,14 +305,13 @@ router.post('/homepage/sidebar/update_updates', auth, (req, res) => {
       console.log(`Sidebar "update" link updated successfully. ID: ${id}`);
       return res.json({
         message: 'Sidebar update-link updated successfully.',
-        updated: { id, name, url, display_order: order }
       });
     });
   });
 });
 
 // Delete sidebar "update" link
-router.post('/homepage/sidebar/delete_updates', auth, (req, res) => {
+router.delete('/homepage/sidebar/updates', auth, (req, res) => {
   let { id } = req.body;
 
   // Sanitize ID
@@ -359,7 +351,7 @@ router.post('/homepage/sidebar/delete_updates', auth, (req, res) => {
       console.log(`Sidebar "update" link deleted successfully. ID: ${numId}`);
       return res.json({
         message: 'Sidebar "update" link deleted successfully.',
-        deleted_id: numId
+        
       });
     });
   });
@@ -407,13 +399,7 @@ router.post('/homepage/sidebar/add_quicklinks', auth, (req, res) => {
     console.log(` New quick link added: ${name} (${url})`);
     return res.status(201).json({
       message: 'Quick Link added successfully.',
-      quicklink: {
-        id: result.insertId,
-        name,
-        url,
-        type: 'quicklink',
-        display_order,
-      },
+     
     });
   });
 });
@@ -421,7 +407,7 @@ router.post('/homepage/sidebar/add_quicklinks', auth, (req, res) => {
 
 
 // update sidebar quicklink
-router.post('/homepage/sidebar/update_quicklink', auth, (req, res) => {
+router.put('/homepage/sidebar/quicklink', auth, (req, res) => {
   const { id, name, url, display_order } = req.body;
 
   //  Validate ID
@@ -429,7 +415,7 @@ router.post('/homepage/sidebar/update_quicklink', auth, (req, res) => {
     return res.status(400).json({ message: 'Invalid or missing id' });
   }
 
-  // ✅ Validate required fields
+  //  Validate required fields
   if (!name || !url) {
     return res.status(400).json({ message: 'Name and URL are required' });
   }
@@ -480,9 +466,49 @@ router.post('/homepage/sidebar/update_quicklink', auth, (req, res) => {
 
       res.json({
         message: ' Quick Link updated successfully',
-        updatedRows: result.affectedRows,
+        
       });
     });
   });
+});
+
+
+// delete sidebar quicklink
+router.delete('/homepage/sidebar/quicklink', auth, (req, res) => {
+  let { id } = req.body;
+    // Sanitize ID
+    if (typeof id === 'string') id = id.trim();
+    id = String(id).replace(/[^\d]/g, '');
+    const numId = parseInt(id, 10);
+    if (!numId || isNaN(numId) || numId <= 0) {
+      return res.status(400).json({ message: 'Valid numeric "id" is required.' });
+    }
+    // Verify record and type
+    const checkQuery = 'SELECT id, type FROM sidebar_links WHERE id = ?';
+    db.query(checkQuery, [numId], (checkErr, results) => {
+        if (checkErr) {
+            console.error('Database check error:', checkErr);
+            return res.status(500).json({ message: 'Database error while verifying record.' });
+        }
+        if (results.length === 0) {
+            return res.status(404).json({ message: 'No sidebar link found with this ID.' });
+        }
+        const record = results[0];
+        if (record.type !== 'quicklink') {
+            return res.status(400).json({ message: 'The provided ID does not belong to a "quicklink" type link.' });
+        }
+        // Delete record
+        const deleteQuery = 'DELETE FROM sidebar_links WHERE id = ? AND type = "quicklink"';
+        db.query(deleteQuery, [numId], (deleteErr) => {
+            if (deleteErr) {
+                console.error('Database delete error:', deleteErr);
+                return res.status(500).json({ message: 'Database error while deleting record.' });
+            }       
+            console.log(`Sidebar "quicklink" link deleted successfully. ID: ${numId}`);
+            return res.json({   
+                message: 'Sidebar quicklink link deleted successfully.',
+            });
+        });
+    });
 });
 module.exports = router;

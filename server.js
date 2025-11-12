@@ -4,68 +4,14 @@ const express = require('express');
 const authMiddleware = require('./middleware/auth');
 const db = require('./db');
 const path = require('path');
-const helmet = require('helmet');
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-const homepageRoutes = require('./routes/homepage');
-const userRoutes = require('./routes/users');
-const AdminRoutes = require('./routes/admin');
-const AboutRoutes = require('./routes/about');
-const ContentRoutes=require('./routes/content');
-const ActivitiesRoutes = require('./routes/activities');
-const LinksRoutes = require('./routes/links');
-
-app.use('/user', userRoutes);
-app.use('/homepage', homepageRoutes);
-app.use('/admin', AdminRoutes);
-app.use('/about', AboutRoutes);
-app.use('/content',ContentRoutes);
-app.use('/activities', ActivitiesRoutes);
-app.use("/links", LinksRoutes);
+const securityHeaders = require('./middleware/securityHeaders');
 
 dotenv.config();
 
 const PORT = process.env.PORT;
 const HOST = process.env.HOST;
 const FRONTEND_ORIGIN = process.env.CORS_ORIGIN || 'https://yourfrontend.com';
-
-
-// security middleware
-app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            baseUri: ["'self'"],
-            fontSrc: ["'self'", "https:", "data:"],
-            formAction: ["'self'"],
-            frameAncestors: ["'self'"],
-            imgSrc: ["'self'", "data:"],
-            objectSrc: ["'none'"],
-            scriptSrc: ["'self'"],
-            scriptSrcAttr: ["'none'"],
-            styleSrc: ["'self'", "https:"],
-            upgradeInsecureRequests: [],
-        },
-    },
-    crossOriginEmbedderPolicy: true,
-    crossOriginOpenerPolicy: { policy: "same-origin" },
-    crossOriginResourcePolicy: { policy: "same-origin" },
-    referrerPolicy: { policy: "no-referrer" },
-    dnsPrefetchControl: { allow: false },
-    frameguard: { action: "sameorigin" },
-    hidePoweredBy: true,
-    hsts: {
-        maxAge: 31536000,
-        includeSubDomains: true,
-        preload: true,
-    },
-    ieNoOpen: true,
-    noSniff: true,
-    permittedCrossDomainPolicies: { permittedPolicies: "none" },
-    xssFilter: false,
-}));
 
 app.use(cors({
     origin: FRONTEND_ORIGIN,
@@ -74,31 +20,38 @@ app.use(cors({
     credentials: true,
 }));
 
+app.disable("x-powered-by");
+app.use(securityHeaders);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// static files
+const homepageRoutes = require('./routes/homepage');
+const userRoutes = require('./routes/users');
+const AdminRoutes = require('./routes/admin');
+const AboutRoutes = require('./routes/about');
+const ContentRoutes=require('./routes/content');
+const ActivitiesRoutes = require('./routes/activities');
+const LinksRoutes = require('./routes/links');
+const ArticleRoutes = require('./routes/articles');
+const GalleryRoutes = require('./routes/gallery');
+const publicationsRoutes = require("./routes/publications");
+const utilityRoutes = require("./routes/utility");
+const manageFilesRoutes = require("./routes/manageFiles");
 
-// debug: list registered routes
-if (app._router && Array.isArray(app._router.stack)) {
-  console.log('Registered routes:');
-  app._router.stack.forEach((m) => {
-    if (!m) return;
-    if (m.route && m.route.path) {
-      const methods = Object.keys(m.route.methods || {}).join(',').toUpperCase();
-      console.log(methods, m.route.path);
-    } else if (m.name === 'router' && m.handle && Array.isArray(m.handle.stack)) {
-      m.handle.stack.forEach((r) => {
-        if (!r) return;
-        if (r.route && r.route.path) {
-          const methods = Object.keys(r.route.methods || {}).join(',').toUpperCase();
-          console.log(methods, r.route.path);
-        }
-      });
-    }
-  });
-} else {
-  console.warn('No routes registered yet (app._router is undefined).');
-}
+
+app.use('/user', userRoutes);
+app.use('/homepage', homepageRoutes);
+app.use('/admin', AdminRoutes);
+app.use('/about', AboutRoutes);
+app.use('/content',ContentRoutes);
+app.use('/activities', ActivitiesRoutes);
+app.use('/links', LinksRoutes);
+app.use('/articles', ArticleRoutes);
+app.use('/gallery', GalleryRoutes);
+app.use('/manage', manageFilesRoutes);
+app.use('/publications', publicationsRoutes);
+app.use('/', utilityRoutes);
 
 
 app.use((req, res) => {

@@ -4,6 +4,7 @@ const fs = require('fs');
 const db = require('../db');
 const auth = require('../middleware/auth');
 const { upload, imageValidator } = require('../middleware/validateimage');
+const util = require('util'); 
 const router = express.Router();
 
 // GET HOMEPAGE OFFICIALS (hero banner)
@@ -74,18 +75,20 @@ router.get('/sidebar/quicklinks', (req, res) => {
 /* GET /gallery/photos/latest - latest 4-5 photos */
 router.get('/photos/latest', async (req, res, next) => {
     try {
-        const rows = await query(
+        const [rows] = await db.promise().query(
             `SELECT id, title, date, image_url
-       FROM gallery_photos
-       ORDER BY date DESC
-       LIMIT 5`
+             FROM gallery_photos
+             ORDER BY date DESC
+             LIMIT 5`
         );
         res.json(rows);
-    } catch (err) { next(err); }
+    } catch (err) { 
+        next(err); 
+    }
 });
-
 /* GET /gallery/videos/latest */
 router.get('/videos/latest', async (req, res, next) => {
+    const query = util.promisify(db.query).bind(db);
     try {
         const rows = await query(
             `SELECT id, title, date, video_id, thumbnail_url

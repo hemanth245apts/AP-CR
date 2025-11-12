@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
 
-// ⚙️ Configure multer to keep uploaded file in memory — not saved on disk yet
+//  Configure multer to keep uploaded file in memory — not saved on disk yet
 const storage = multer.memoryStorage();
 
 const upload = multer({
@@ -65,21 +65,21 @@ function isValidPDF(buffer) {
     return true;
 }
 
-// ✅ UPDATED: Validate *both* pdf_english and pdf_telugu
+//  UPDATED: Validate *both* pdf_english and pdf_telugu
 function pdfValidator(req, res, next) {
     try {
         const english = req.files?.pdf_english?.[0];
         const telugu = req.files?.pdf_telugu?.[0];
 
-        // ✅ Require at least one file
+        //  Require at least one file
         if (!english && !telugu) {
             return res.status(400).json({ message: "No file uploaded" });
         }
 
-        // ✅ Combine available files
+        //  Combine available files
         const files = [english, telugu].filter(Boolean);
 
-        // ✅ Validate each file using your existing logic
+        //  Validate each file using your existing logic
         for (const file of files) {
             const { originalname, buffer, mimetype } = file;
 
@@ -92,8 +92,6 @@ function pdfValidator(req, res, next) {
                 return res.status(400).json({ message: "Invalid or potentially unsafe PDF file" });
             }
         }
-
-        // ✅ Attach them for your route if needed
         req.validatedPDFs = {
             english,
             telugu
