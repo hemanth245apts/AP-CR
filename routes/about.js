@@ -210,6 +210,7 @@ router.delete("/chairmans/:id", auth, async (req, res) => {
     }
 });
 
+
 router.post(
     "/rti",
     auth,
@@ -229,6 +230,7 @@ router.post(
                 appellate_phone
             } = req.body;
 
+            // Basic validation
             if (!pio_name || !pio_phone) {
                 return res.status(400).json({ error: "Missing PIO details" });
             }
@@ -236,31 +238,43 @@ router.post(
             let englishPDF = null;
             let teluguPDF = null;
 
+            // Ensure pdfs folder exists
+            const pdfDir = path.join(__dirname, "../pdfs");
+            if (!fs.existsSync(pdfDir)) fs.mkdirSync(pdfDir);
+
+            // Handle English PDF upload
             if (req.files?.pdf_english) {
                 const f = req.files.pdf_english[0];
-                const ext = path.extname(f.originalname); // get original extension (.pdf)
+                const ext = path.extname(f.originalname).toLowerCase();
                 const stamped = `rti_english_${Date.now()}${ext}`;
-                fs.renameSync(f.path, path.join("pdfs", stamped));
+                const destPath = path.join(pdfDir, stamped);
+
+                // Save buffer to file
+                fs.writeFileSync(destPath, f.buffer);
                 englishPDF = `/pdfs/${stamped}`;
             }
 
+            // Handle Telugu PDF upload
             if (req.files?.pdf_telugu) {
                 const f = req.files.pdf_telugu[0];
-                const ext = path.extname(f.originalname); // get original extension (.pdf)
+                const ext = path.extname(f.originalname).toLowerCase();
                 const stamped = `rti_telugu_${Date.now()}${ext}`;
-                fs.renameSync(f.path, path.join("pdfs", stamped));
+                const destPath = path.join(pdfDir, stamped);
+
+                // Save buffer to file
+                fs.writeFileSync(destPath, f.buffer);
                 teluguPDF = `/pdfs/${stamped}`;
             }
 
-
+            // Insert or update RTI data
             await q(
                 `INSERT INTO about_rti (
                     id, pio_name, pio_phone, apio_name, apio_phone,
                     appellate_name, appellate_phone,
                     pdf_english_url, pdf_telugu_url
-                 )
-                 VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE
+                )
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
                     pio_name = VALUES(pio_name),
                     pio_phone = VALUES(pio_phone),
                     apio_name = VALUES(apio_name),
@@ -282,9 +296,11 @@ router.post(
                 ]
             );
 
-            res.json({ message: "RTI information updated successfully" });
+            return res.status(200).json({ message: "RTI information updated successfully" });
+
         } catch (err) {
-            handleError(res, err);
+            console.error("POST /rti ERROR:", err);
+            return res.status(500).json({ error: "Internal Server Error", details: err.message });
         }
     }
 );
