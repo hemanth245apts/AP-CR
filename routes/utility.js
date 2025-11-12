@@ -1,12 +1,12 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../db"); // Your MySQL connection
+const db = require("../db");
 const bodyParser = require("body-parser");
 
-// Middleware to parse JSON
+// Parse JSON body
 router.use(bodyParser.json());
 
-// SQL wrapper
+// SQL helper
 function q(sql, params = []) {
   return new Promise((resolve, reject) => {
     db.query(sql, params, (err, rows) => {
@@ -20,12 +20,12 @@ function q(sql, params = []) {
  * POST /capture-email
  * Receives { email, fileName } and stores in DB
  */
-router.post("/capture-email", async (req, res) => {
+router.post("/capture-email", async (req, res, next) => {
   try {
     const { email, fileName } = req.body;
 
     if (!email || !fileName) {
-      return res.status(400).json({ error: "Both email and fileName are required" });
+      return res.status(400).json({ error: "Both email and fileName are required." });
     }
 
     await q(
@@ -33,10 +33,9 @@ router.post("/capture-email", async (req, res) => {
       [email, fileName]
     );
 
-    res.json({ success: true });
+    return res.status(200).json({ success: true });
   } catch (err) {
-    console.error("POST /capture-email ERROR:", err);
-    res.status(500).json({ error: "Failed to capture email" });
+    next(err); // Pass to global error handler in server.js
   }
 });
 

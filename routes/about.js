@@ -130,12 +130,13 @@ router.post(
 
             let imageUrl = null;
             if (req.file) {
-                const base = path.basename(req.file.path);
-                const stamped = `${Date.now()}_${base}`;
+                const ext = path.extname(req.file.originalname); // get extension (.jpg, .png, etc.)
+                const stamped = `organisations_${Date.now()}${ext}`; // append extension
                 const dest = path.join("images", stamped);
                 fs.renameSync(req.file.path, dest);
                 imageUrl = `/images/${stamped}`;
             }
+
 
             await q(
                 `INSERT INTO about_organisation (id, description, chart_image_url)
@@ -237,17 +238,20 @@ router.post(
 
             if (req.files?.pdf_english) {
                 const f = req.files.pdf_english[0];
-                const stamped = `${Date.now()}_${f.originalname}`;
+                const ext = path.extname(f.originalname); // get original extension (.pdf)
+                const stamped = `rti_english_${Date.now()}${ext}`;
                 fs.renameSync(f.path, path.join("pdfs", stamped));
                 englishPDF = `/pdfs/${stamped}`;
             }
 
             if (req.files?.pdf_telugu) {
                 const f = req.files.pdf_telugu[0];
-                const stamped = `${Date.now()}_${f.originalname}`;
+                const ext = path.extname(f.originalname); // get original extension (.pdf)
+                const stamped = `rti_telugu_${Date.now()}${ext}`;
                 fs.renameSync(f.path, path.join("pdfs", stamped));
                 teluguPDF = `/pdfs/${stamped}`;
             }
+
 
             await q(
                 `INSERT INTO about_rti (

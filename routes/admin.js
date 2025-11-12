@@ -4,7 +4,7 @@ const fs = require('fs');
 const db = require('../db');
 const auth = require('../middleware/auth');
 const { upload, imageValidator } = require('../middleware/validateimage');
-
+const bcrypt = require('bcryptjs');
 const router = express.Router();
 
 
@@ -24,7 +24,11 @@ function isMaliciousText(text) {
   ];
   return badPatterns.some((pattern) => pattern.test(lower));
 }
-
+function isStrongPassword(password) {
+  const passwordRegex =
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  return passwordRegex.test(password);
+}
 /**
  * POST /homepage/officials
  * Uploads an official’s image and data securely
@@ -191,7 +195,7 @@ router.delete('/homepage/Carousel', auth, (req, res) => {
 
 
 // sidebar updates link for creation 
-router.post('/homepage/sidebar/add_updates', auth, (req, res) => {
+router.post('/homepage/sidebar/updates', auth, (req, res) => {
   let { name, url, display_order } = req.body;
 
   // Basic validation
@@ -359,7 +363,7 @@ router.delete('/homepage/sidebar/updates', auth, (req, res) => {
 
 
 // add sidebar quicklink
-router.post('/homepage/sidebar/add_quicklinks', auth, (req, res) => {
+router.post('/homepage/sidebar/quicklinks', auth, (req, res) => {
   let { name, url, display_order } = req.body;
 
   //  Basic validation
@@ -510,5 +514,71 @@ router.delete('/homepage/sidebar/quicklink', auth, (req, res) => {
             });
         });
     });
+});
+
+router.put("/changepasswd", auth, async (req, res) => {
+  try {
+    const { current_Pass, New_Pass, Re_Pass } = req.body;
+
+    if (!current_Pass || !New_Pass || !Re_Pass) {
+      return res
+        .status(400)
+        .json({ message: "All fields (current_Pass, New_Pass, Re_Pass) are required" });
+    }
+
+    if (New_Pass !== Re_Pass) {
+      return res.status(400).json({ message: "New passwords do not match" });
+    }
+
+    // Validate password strength
+    if (!isStrongPassword(New_Pass)) {
+      return res.status(400).json({
+        message:
+          "Password must be at least 8 characters long, include upper & lower case letters, a number, and a special character",
+      });
+    }
+
+    const userId = req.user.id; // from auth middleware
+
+    // Step 1: Fetch user from DB
+    db.query("SELECT password FROM users WHERE id = ?", [userId], async (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ message: "Database error" });
+      }
+
+      if (results.length === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const user = results[0];
+
+      // Step 2: Verify current password
+      const isMatch = await bcrypt.compare(current_Pass, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ message: "Current password is incorrect" });
+      }
+
+      // Step 3: Hash new password
+      const hashedPassword = await bcrypt.hash(New_Pass, 10);
+
+      // Step 4: Update DB
+      db.query(
+        "UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?",
+        [hashedPassword, userId],
+        (err) => {
+          if (err) {
+            console.error("DB update error:", err);
+            return res.status(500).json({ message: "Failed to update password" });
+          }
+
+          res.status(200).json({ message: "Password updated successfully" });
+        }
+      );
+    });
+  } catch (error) {
+    console.error("Password change error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 module.exports = router;

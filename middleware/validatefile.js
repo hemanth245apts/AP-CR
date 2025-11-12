@@ -1,3 +1,5 @@
+// middleware for one image + one pdf used in publications.js 
+
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
@@ -10,7 +12,6 @@ const upload = multer({
     limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-// middleware for one image + one pdf used in publications.js 
 function validateFiles(req, res, next) {
     try {
         const img = req.files?.cover_image?.[0];
